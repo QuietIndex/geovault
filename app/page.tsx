@@ -1,5 +1,5 @@
 import { MapPinned } from "lucide-react"
-import { GeoVault } from "@/components/geo-vault"
+import { GeoLockbox } from "@/components/geo-lockbox"
 
 export default function Page() {
   return (
@@ -15,21 +15,21 @@ export default function Page() {
           <MapPinned className="size-6 text-primary" aria-hidden="true" />
         </div>
         <h1 className="text-balance text-3xl font-bold tracking-tight text-foreground md:text-4xl">
-          GeoVault
+          Geo Lockbox
         </h1>
         <p className="mt-3 text-pretty leading-relaxed text-muted-foreground">
-          A password vault that stays sealed until you are physically standing
-          in the right place. Set a safe location and unlock radius, store a
-          secret, then verify with your device&apos;s GPS.
+          A location-locked vault. Set a safe spot and unlock radius, seal your
+          secret, and it stays hidden on every visit until you physically return
+          to that location and verify with GPS.
         </p>
       </header>
 
       <div className="relative z-10 flex w-full justify-center">
-        <GeoVault />
+        <GeoLockbox />
       </div>
 
       <footer className="relative z-10 mt-12 text-center text-xs text-muted-foreground">
-        Location is checked in your browser and never leaves your device.
+        Everything is stored in your browser and checked on your device. Nothing is sent anywhere.
       </footer>
     </main>
   )
