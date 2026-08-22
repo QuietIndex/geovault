@@ -29,7 +29,7 @@ export default function Page() {
       </div>
 
       <footer className="relative z-10 mt-12 text-center text-xs text-muted-foreground">
-        Everything is stored in your browser and checked on your device. Nothing is sent anywhere.
+        Your secret is stored securely on the server and only revealed after your GPS position is verified on location.
       </footer>
     </main>
   )

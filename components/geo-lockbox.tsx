@@ -15,35 +15,16 @@ import {
   RotateCcw,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-
-const STORAGE_KEY = "geo-lockbox:vault:v1"
-
-type VaultConfig = {
-  lat: number
-  lng: number
-  radius: number
-  secret: string
-}
+import {
+  attemptUnlock,
+  getVaultStatus,
+  resetVault as resetVaultAction,
+  saveVault,
+  type VaultConfig,
+} from "@/app/actions"
 
 type Mode = "loading" | "setup" | "locked" | "unlocked"
 type UnlockState = "idle" | "checking" | "denied"
-
-// Haversine distance between two lat/lng points, in meters.
-function haversineDistance(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number,
-): number {
-  const R = 6_371_000 // Earth radius in meters
-  const toRad = (deg: number) => (deg * Math.PI) / 180
-  const dLat = toRad(lat2 - lat1)
-  const dLon = toRad(lon2 - lon1)
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2
-  return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)))
-}
 
 function fmtDistance(m: number) {
   return m >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${Math.round(m)} m`
@@ -86,33 +67,27 @@ export function GeoLockbox() {
   const [secret, setSecret] = useState("")
   const [showSecretInput, setShowSecretInput] = useState(false)
   const [locating, setLocating] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   // Unlock flow state
   const [unlockState, setUnlockState] = useState<UnlockState>("idle")
   const [deniedMessage, setDeniedMessage] = useState("")
   const [distance, setDistance] = useState<number | null>(null)
 
-  // Load persisted vault on mount (client only).
+  // Load vault status from the server on mount.
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY)
-      if (raw) {
-        const parsed = JSON.parse(raw) as VaultConfig
-        if (
-          typeof parsed?.lat === "number" &&
-          typeof parsed?.lng === "number" &&
-          typeof parsed?.radius === "number" &&
-          typeof parsed?.secret === "string"
-        ) {
-          setConfig(parsed)
-          setMode("locked")
-          return
-        }
-      }
-    } catch {
-      // Corrupt storage — fall through to setup.
+    let active = true
+    getVaultStatus()
+      .then(({ exists }) => {
+        if (!active) return
+        setMode(exists ? "locked" : "setup")
+      })
+      .catch(() => {
+        if (active) setMode("setup")
+      })
+    return () => {
+      active = false
     }
-    setMode("setup")
   }, [])
 
   const canLock = useMemo(() => {
@@ -141,20 +116,27 @@ export function GeoLockbox() {
     )
   }
 
-  const lockVault = () => {
-    if (!canLock) return
+  const lockVault = async () => {
+    if (!canLock || saving) return
     const next: VaultConfig = {
       lat: Number(lat),
       lng: Number(lng),
       radius: Number(radius),
       secret: secret.trim(),
     }
+    setSaving(true)
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+      const { ok } = await saveVault(next)
+      if (!ok) {
+        setSaving(false)
+        return
+      }
     } catch {
-      // Storage unavailable — still lock in memory for this session.
+      setSaving(false)
+      return
     }
-    setConfig(next)
+    setSaving(false)
+    setConfig(null)
     // Wipe the form so nothing lingers on screen.
     setLat("")
     setLng("")
@@ -168,8 +150,6 @@ export function GeoLockbox() {
   }
 
   const checkGps = () => {
-    if (!config) return
-
     if (!("geolocation" in navigator)) {
       setUnlockState("denied")
       setDeniedMessage("Geolocation is not supported by this browser.")
@@ -181,27 +161,39 @@ export function GeoLockbox() {
     setDeniedMessage("")
 
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const dist = haversineDistance(
-          pos.coords.latitude,
-          pos.coords.longitude,
-          config.lat,
-          config.lng,
-        )
-        setDistance(dist)
-        if (dist <= config.radius) {
-          setUnlockState("idle")
-          // Reveal the full setup form, pre-filled with the current config so
-          // the user can view/edit the secret & target and re-seal.
-          setLat(String(config.lat))
-          setLng(String(config.lng))
-          setRadius(String(config.radius))
-          setSecret(config.secret)
-          setShowSecretInput(true)
-          setMode("unlocked")
-        } else {
+      async (pos) => {
+        try {
+          // Server verifies the position and only returns the secret when we
+          // are physically inside the configured radius.
+          const result = await attemptUnlock({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+          })
+
+          if (result.granted) {
+            setDistance(result.distance)
+            setConfig(result.config)
+            setUnlockState("idle")
+            // Reveal the full setup form, pre-filled with the current config so
+            // the user can view/edit the secret & target and re-seal.
+            setLat(String(result.config.lat))
+            setLng(String(result.config.lng))
+            setRadius(String(result.config.radius))
+            setSecret(result.config.secret)
+            setShowSecretInput(true)
+            setMode("unlocked")
+          } else {
+            setDistance(result.distance)
+            if (result.radius !== null) {
+              setConfig({ lat: 0, lng: 0, radius: result.radius, secret: "" })
+            }
+            setUnlockState("denied")
+            setDeniedMessage(result.reason)
+          }
+        } catch {
           setUnlockState("denied")
-          setDeniedMessage("Access Denied: You are not in the correct location.")
+          setDistance(null)
+          setDeniedMessage("Something went wrong while verifying your location.")
         }
       },
       () => {
@@ -213,9 +205,9 @@ export function GeoLockbox() {
     )
   }
 
-  const resetVault = () => {
+  const resetVault = async () => {
     try {
-      window.localStorage.removeItem(STORAGE_KEY)
+      await resetVaultAction()
     } catch {
       // ignore
     }
@@ -328,7 +320,7 @@ export function GeoLockbox() {
 
           <Field
             label="Secret text / password"
-            hint="Saved only in this browser. It cannot be viewed again until you unlock on location."
+            hint="Stored securely on the server. It cannot be viewed again until you unlock on location."
             icon={<Lock className="size-3.5 text-primary" aria-hidden="true" />}
           >
             <div className="relative">
@@ -357,11 +349,19 @@ export function GeoLockbox() {
           <Button
             type="button"
             onClick={lockVault}
-            disabled={!canLock}
+            disabled={!canLock || saving}
             className="mt-1 w-full justify-center gap-2 py-6 text-base font-semibold"
           >
-            <Lock className="size-5" aria-hidden="true" />
-            {isUnlockedSetup ? "Save & Re-lock Vault" : "Lock Vault"}
+            {saving ? (
+              <Loader2 className="size-5 animate-spin" aria-hidden="true" />
+            ) : (
+              <Lock className="size-5" aria-hidden="true" />
+            )}
+            {saving
+              ? "Sealing…"
+              : isUnlockedSetup
+                ? "Save & Re-lock Vault"
+                : "Lock Vault"}
           </Button>
 
           {!canLock ? (
