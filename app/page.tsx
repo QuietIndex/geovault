@@ -1,47 +1,36 @@
+import { MapPinned } from "lucide-react"
+import { GeoVault } from "@/components/geo-vault"
+
 export default function Page() {
   return (
-    <main
-      style={{
-        colorScheme: 'light dark',
-        position: 'relative',
-        display: 'flex',
-        minHeight: '100vh',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'light-dark(#fff, #000)',
-        color: 'light-dark(#000, #fff)',
-      }}
-    >
-      <svg
+    <main className="relative flex min-h-dvh flex-col items-center px-4 py-10 md:py-16">
+      {/* subtle grid backdrop */}
+      <div
         aria-hidden="true"
-        style={{ width: 80, height: 80 }}
-        width={80}
-        height={80}
-        fill="none"
-        viewBox="0 0 20 20"
-        xmlns="http://www.w3.org/2000/svg"
-        stroke="currentColor"
-        strokeWidth="0.5"
-      >
-        <path
-          d="M14.2 14.2H17V6.9375C17 4.76288 15.2371 3 13.0625 3H5.8V5.8M14.2 14.2V7.79063L7.79062 14.2H14.2ZM14.2 14.2V17H6.9375C4.76288 17 3 15.2371 3 13.0625V5.8H5.8M5.8 5.8V12.2313L12.2313 5.8H5.8Z"
-          strokeLinejoin="round"
-        />
-      </svg>
-      <p
-        style={{
-          position: 'absolute',
-          left: '50%',
-          top: 'calc(50% + 56px)',
-          transform: 'translateX(-50%)',
-          whiteSpace: 'nowrap',
-          fontSize: '14px',
-          fontWeight: 500,
-          color: 'light-dark(#71717a, #a1a1aa)',
-        }}
-      >
-        Your v0 generation will show here.
-      </p>
+        className="pointer-events-none absolute inset-0 opacity-[0.06] [background-image:linear-gradient(to_right,var(--foreground)_1px,transparent_1px),linear-gradient(to_bottom,var(--foreground)_1px,transparent_1px)] [background-size:44px_44px]"
+      />
+
+      <header className="relative z-10 mb-10 flex max-w-2xl flex-col items-center text-center">
+        <div className="mb-4 flex size-12 items-center justify-center rounded-xl border border-primary/40 bg-primary/10">
+          <MapPinned className="size-6 text-primary" aria-hidden="true" />
+        </div>
+        <h1 className="text-balance text-3xl font-bold tracking-tight text-foreground md:text-4xl">
+          GeoVault
+        </h1>
+        <p className="mt-3 text-pretty leading-relaxed text-muted-foreground">
+          A password vault that stays sealed until you are physically standing
+          in the right place. Set a safe location and unlock radius, store a
+          secret, then verify with your device&apos;s GPS.
+        </p>
+      </header>
+
+      <div className="relative z-10 flex w-full justify-center">
+        <GeoVault />
+      </div>
+
+      <footer className="relative z-10 mt-12 text-center text-xs text-muted-foreground">
+        Location is checked in your browser and never leaves your device.
+      </footer>
     </main>
   )
 }
