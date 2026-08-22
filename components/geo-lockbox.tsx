@@ -4,7 +4,6 @@ import type React from "react"
 import { useEffect, useMemo, useState } from "react"
 import {
   Lock,
-  Unlock,
   MapPin,
   Radar,
   ShieldCheck,
@@ -192,6 +191,13 @@ export function GeoLockbox() {
         setDistance(dist)
         if (dist <= config.radius) {
           setUnlockState("idle")
+          // Reveal the full setup form, pre-filled with the current config so
+          // the user can view/edit the secret & target and re-seal.
+          setLat(String(config.lat))
+          setLng(String(config.lng))
+          setRadius(String(config.radius))
+          setSecret(config.secret)
+          setShowSecretInput(true)
           setMode("unlocked")
         } else {
           setUnlockState("denied")
@@ -220,13 +226,6 @@ export function GeoLockbox() {
     setMode("setup")
   }
 
-  const relock = () => {
-    setUnlockState("idle")
-    setDeniedMessage("")
-    setDistance(null)
-    setMode("locked")
-  }
-
   // ---- Loading (avoids setup/locked flash before storage is read) ----
   if (mode === "loading") {
     return (
@@ -237,17 +236,37 @@ export function GeoLockbox() {
     )
   }
 
-  // ---- Setup mode ----
-  if (mode === "setup") {
+  // ---- Setup mode (also shown when UNLOCKED, so the user can edit & re-seal) ----
+  if (mode === "setup" || mode === "unlocked") {
+    const isUnlockedSetup = mode === "unlocked"
     return (
       <section
-        aria-label="Set up your lockbox"
+        aria-label={isUnlockedSetup ? "Unlocked lockbox" : "Set up your lockbox"}
         className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl shadow-black/40"
       >
+        {isUnlockedSetup ? (
+          <div
+            role="status"
+            aria-live="polite"
+            className="mb-5 flex items-center gap-3 rounded-xl border border-primary/40 bg-primary/10 px-4 py-3 text-sm font-medium text-primary"
+          >
+            <ShieldCheck className="size-5 shrink-0" aria-hidden="true" />
+            <span className="text-pretty">🔓 UNLOCKED: In Safe Location</span>
+          </div>
+        ) : null}
+
+        {isUnlockedSetup && distance !== null && config ? (
+          <p className="mb-5 text-center font-mono text-xs text-muted-foreground">
+            Measured distance:{" "}
+            <span className="text-primary">{fmtDistance(distance)}</span>{" "}
+            (allowed {fmtDistance(config.radius)})
+          </p>
+        ) : null}
+
         <div className="mb-5 flex items-center gap-2">
           <Radar className="size-4 text-primary" aria-hidden="true" />
           <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-            Configure Safe Location
+            {isUnlockedSetup ? "Review & Update Vault" : "Configure Safe Location"}
           </h2>
         </div>
 
@@ -342,48 +361,53 @@ export function GeoLockbox() {
             className="mt-1 w-full justify-center gap-2 py-6 text-base font-semibold"
           >
             <Lock className="size-5" aria-hidden="true" />
-            Lock Vault
+            {isUnlockedSetup ? "Save & Re-lock Vault" : "Lock Vault"}
           </Button>
 
           {!canLock ? (
             <p className="text-center text-xs text-muted-foreground">
               Fill in latitude, longitude, radius, and a secret to seal the vault.
             </p>
+          ) : isUnlockedSetup ? (
+            <p className="text-center text-xs text-muted-foreground">
+              Edit any field, then re-lock. The vault seals again and hides everything until you return.
+            </p>
+          ) : null}
+
+          {isUnlockedSetup ? (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={resetVault}
+              className="w-full justify-center gap-2 text-muted-foreground hover:text-foreground"
+            >
+              <RotateCcw className="size-4" aria-hidden="true" />
+              Erase vault &amp; start over
+            </Button>
           ) : null}
         </div>
       </section>
     )
   }
 
-  // ---- Locked & Unlocked share the vault card ----
-  const isUnlocked = mode === "unlocked"
+  // ---- Locked mode ----
   const isChecking = unlockState === "checking"
   const isDenied = unlockState === "denied"
 
   return (
     <section
-      aria-label="Lockbox"
+      aria-label="Sealed lockbox"
       className="flex w-full max-w-md flex-col rounded-2xl border border-border bg-card p-6 shadow-2xl shadow-black/40"
     >
       <div className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {isUnlocked ? (
-            <Unlock className="size-4 text-primary" aria-hidden="true" />
-          ) : (
-            <Lock className="size-4 text-muted-foreground" aria-hidden="true" />
-          )}
+          <Lock className="size-4 text-muted-foreground" aria-hidden="true" />
           <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
             The Lockbox
           </h2>
         </div>
-        <span
-          className={`rounded-full border px-2.5 py-0.5 font-mono text-[11px] ${
-            isUnlocked
-              ? "border-primary/40 bg-primary/10 text-primary"
-              : "border-border bg-secondary/40 text-muted-foreground"
-          }`}
-        >
-          {isUnlocked ? "OPEN" : "SEALED"}
+        <span className="rounded-full border border-border bg-secondary/40 px-2.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+          SEALED
         </span>
       </div>
 
@@ -392,109 +416,58 @@ export function GeoLockbox() {
         role="status"
         aria-live="polite"
         className={`mb-5 flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium ${
-          isUnlocked
-            ? "border-primary/40 bg-primary/10 text-primary"
-            : isChecking
-              ? "border-border bg-secondary/40 text-muted-foreground"
-              : "border-destructive/40 bg-destructive/10 text-destructive"
+          isChecking
+            ? "border-border bg-secondary/40 text-muted-foreground"
+            : "border-destructive/40 bg-destructive/10 text-destructive"
         }`}
       >
         {isChecking ? (
           <Loader2 className="size-5 shrink-0 animate-spin" aria-hidden="true" />
-        ) : isUnlocked ? (
-          <ShieldCheck className="size-5 shrink-0" aria-hidden="true" />
         ) : (
           <ShieldAlert className="size-5 shrink-0" aria-hidden="true" />
         )}
         <span className="text-pretty">
-          {isUnlocked
-            ? "🔓 UNLOCKED: In Safe Location"
-            : isChecking
-              ? "Checking your GPS position…"
-              : isDenied
-                ? deniedMessage
-                : "🔒 VAULT SEALED: Location Not Verified"}
+          {isChecking
+            ? "Checking your GPS position…"
+            : isDenied
+              ? deniedMessage
+              : "🔒 VAULT SEALED: Location Not Verified"}
         </span>
       </div>
 
-      {/* Secret display */}
-      <div
-        className={`flex min-h-40 flex-1 flex-col items-center justify-center rounded-xl border p-6 text-center transition-colors ${
-          isUnlocked
-            ? "border-primary/30 bg-primary/5"
-            : "border-dashed border-border bg-background/40"
-        }`}
-      >
-        {isUnlocked ? (
-          <>
-            <p className="mb-2 text-xs uppercase tracking-widest text-muted-foreground">
-              Your secret
-            </p>
-            <p className="max-w-full break-words font-mono text-lg font-semibold text-foreground">
-              {config?.secret}
-            </p>
-          </>
-        ) : (
-          <>
-            <Lock className="mb-3 size-8 text-muted-foreground/60" aria-hidden="true" />
-            <p className="font-mono text-2xl tracking-[0.35em] text-muted-foreground/50">
-              ••••••••
-            </p>
-            <p className="mt-3 text-xs text-muted-foreground">
-              The secret and target location are hidden until you unlock on site.
-            </p>
-          </>
-        )}
+      {/* Hidden secret placeholder */}
+      <div className="flex min-h-40 flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-border bg-background/40 p-6 text-center">
+        <Lock className="mb-3 size-8 text-muted-foreground/60" aria-hidden="true" />
+        <p className="font-mono text-2xl tracking-[0.35em] text-muted-foreground/50">
+          ••••••••
+        </p>
+        <p className="mt-3 text-xs text-muted-foreground">
+          The secret and target location are hidden until you unlock on site.
+        </p>
       </div>
 
-      {/* Distance readout */}
+      {/* Distance readout (only after a denied attempt) */}
       {distance !== null && config ? (
         <p className="mt-4 text-center font-mono text-xs text-muted-foreground">
           Last measured distance:{" "}
-          <span className={isUnlocked ? "text-primary" : "text-destructive"}>
-            {fmtDistance(distance)}
-          </span>{" "}
+          <span className="text-destructive">{fmtDistance(distance)}</span>{" "}
           (allowed {fmtDistance(config.radius)})
         </p>
       ) : null}
 
-      {/* Actions */}
-      {isUnlocked ? (
-        <div className="mt-4 flex flex-col gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={relock}
-            className="w-full justify-center gap-2 border-border bg-secondary/40 text-foreground hover:bg-secondary"
-          >
-            <Lock className="size-4" aria-hidden="true" />
-            Seal again
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={resetVault}
-            className="w-full justify-center gap-2 text-muted-foreground hover:text-foreground"
-          >
-            <RotateCcw className="size-4" aria-hidden="true" />
-            Reset / change secret
-          </Button>
-        </div>
-      ) : (
-        <Button
-          type="button"
-          onClick={checkGps}
-          disabled={isChecking}
-          className="mt-4 w-full justify-center gap-2 py-6 text-base font-semibold"
-        >
-          {isChecking ? (
-            <Loader2 className="size-5 animate-spin" aria-hidden="true" />
-          ) : (
-            <LocateFixed className="size-5" aria-hidden="true" />
-          )}
-          Check GPS to Unlock
-        </Button>
-      )}
+      <Button
+        type="button"
+        onClick={checkGps}
+        disabled={isChecking}
+        className="mt-4 w-full justify-center gap-2 py-6 text-base font-semibold"
+      >
+        {isChecking ? (
+          <Loader2 className="size-5 animate-spin" aria-hidden="true" />
+        ) : (
+          <LocateFixed className="size-5" aria-hidden="true" />
+        )}
+        Check GPS to Unlock
+      </Button>
     </section>
   )
 }
