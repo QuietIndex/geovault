@@ -55,8 +55,8 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.48 0.12 168);
+  --primary-foreground: oklch(0.99 0.005 260);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
@@ -156,10 +156,28 @@
 }
 
 @layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) { cursor: pointer; }
   * {
     @apply border-border outline-ring/50;
   }
   body {
     @apply bg-background text-foreground;
   }
+}
+
+html { scroll-behavior: smooth; }
+
+.browser-shell { box-shadow: 0 8px 24px rgb(0 0 0 / 0.08); }
+.browser-tab[aria-current="page"] { box-shadow: 0 -1px 0 rgb(255 255 255 / 0.025); }
+.browser-address { transition: background-color 180ms ease, border-color 180ms ease; }
+.hero-panel { background-image: radial-gradient(ellipse at 86% 12%, color-mix(in oklab, var(--primary) 9%, transparent), transparent 38%); }
+.hero-orbit { box-shadow: 0 0 100px color-mix(in oklab, var(--primary) 6%, transparent); }
+.step-card, .vault-card { transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease; }
+.step-card:hover, .vault-card:hover { transform: translateY(-2px); border-color: color-mix(in oklab, var(--primary) 30%, var(--border)); }
+.eyebrow { color: var(--primary); font-family: var(--font-geist-mono); font-size: 0.68rem; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; }
+.form-section { border: 1px solid var(--border); border-radius: 1rem; padding: 1rem; }
+.form-section-title { color: var(--muted-foreground); font-family: var(--font-geist-mono); font-size: 0.68rem; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
