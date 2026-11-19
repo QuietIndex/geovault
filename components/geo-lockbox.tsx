@@ -191,8 +191,8 @@ export function GeoLockbox({ page = "vault" }: { page?: "vault" | "create" }) {
     captureBestLocation((position) => {
       const distance = haversine(position.latitude, position.longitude, box.lat, box.lng)
       setMeasuredDistance(distance); setAccuracy(position.accuracy)
-      if (position.accuracy > 50) { setMessage("GPS signal is weak. Move to an open area and try again."); setBusy(false); return }
-      const inside = box.mode === "allow" ? position.accuracy <= 50 && distance <= box.radius : distance - position.accuracy <= box.radius
+      if (position.accuracy > 100) { setMessage("GPS signal is too weak to verify this location. Move to an open area and try again."); setBusy(false); return }
+      const inside = box.mode === "allow" ? distance <= box.radius + position.accuracy : distance - position.accuracy <= box.radius
       if (box.mode === "block" && inside) { setMessage(`Blocked: you are within ${formatDistance(distance)} of ${box.name}.`); setBusy(false); return }
       if (box.mode === "allow" && !inside) { setMessage("Access denied: you are not in the allowed location."); setBusy(false); return }
       setSelected(box); setView("unlocked"); setMessage("Location verified. Secret unlocked."); setBusy(false)
