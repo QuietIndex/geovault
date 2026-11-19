@@ -7,8 +7,8 @@ const geistSans = Geist({ subsets: ['latin'], variable: '--font-geist-sans' })
 const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' })
 
 export const metadata: Metadata = {
-  title: 'GeoVault — Location-Based Password Vault',
-  description: 'A secret vault that only unlocks when you are physically in the right place.',
+  title: 'Geo Lockbox — Location-Based Password Vault',
+  description: 'A location-locked password vault with Supabase account sync and device-side GPS checks.',
   generator: 'v0.app',
   icons: {
     icon: [
